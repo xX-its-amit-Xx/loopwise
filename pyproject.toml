@@ -1,0 +1,89 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "loopwise"
+version = "0.1.0"
+description = "Active-learning experiment selection for small-n biological assays: policies that trade exploitation against information gain, with plate-level batch realism."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "Loopwise contributors" }]
+keywords = [
+  "active-learning",
+  "experimental-design",
+  "high-throughput-screening",
+  "bayesian-optimization",
+  "drug-discovery",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "scipy>=1.10",
+  "scikit-learn>=1.3",
+  "psutil>=5.9",
+  "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+lightgbm = ["lightgbm>=4.0"]
+torch = ["torch>=2.0"]
+chem = ["rdkit>=2023.3"]
+notebooks = ["jupyter>=1.0", "nbconvert>=7.0", "ipykernel>=6.0"]
+dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+all = [
+  "lightgbm>=4.0",
+  "torch>=2.0",
+  "rdkit>=2023.3",
+  "jupyter>=1.0",
+  "nbconvert>=7.0",
+  "ipykernel>=6.0",
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/xX-its-amit-Xx/loopwise"
+Repository = "https://github.com/xX-its-amit-Xx/loopwise"
+
+[project.scripts]
+loopwise = "loopwise.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["loopwise*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
+markers = [
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "network: requires network access to download public datasets",
+]
+
+[tool.ruff]
+line-length = 92
+target-version = "py310"
+
+[tool.ruff.lint]
+# E/F for real errors, I for import order, B for bug-prone patterns, UP for
+# modern syntax. The stylistic families (SIM, ISC, RUF naming rules) are left
+# off deliberately: this code is documentation-heavy and several of their
+# rewrites make the intent harder to read, not easier.
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+ignore = [
+  "E501",  # long lines in docstrings are the point
+  "B008",  # ReplicatePolicy() as a dataclass default is intentional and frozen
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B017", "F841"]
+"loopwise/__init__.py" = ["F401"]
+"loopwise/contrib/__init__.py" = ["F401"]
