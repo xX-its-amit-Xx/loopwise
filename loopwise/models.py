@@ -259,21 +259,48 @@ class ModelAdapter:
         return f"{type(self).__name__}({self.name})"
 
 
-def _proba_positive(model: Any, X: np.ndarray) -> np.ndarray:
+def _proba_positive(
+    model: Any, X: np.ndarray, positive_label: Any = 1, strict: bool = False
+) -> np.ndarray:
     """Positive-class probability from a sklearn-style classifier.
 
-    Handles the degenerate-but-real case of a fold in which only one class was
-    observed, where ``predict_proba`` returns a single column.
+    The column index must always come from **this model's own** ``classes_``.
+    For an ensemble member that is not the same as the ensemble's: bagging
+    subsamples rows, so in a low-hit-rate screen a member routinely sees no
+    actives at all. Such a member's ``predict_proba`` returns a single column
+    -- the probability of the one class it knows -- and reading that as
+    P(active) asserts that every compound is certainly active.
+
+    Parameters
+    ----------
+    positive_label
+        The label counted as a hit. Defaults to 1, which is what
+        :class:`~loopwise.campaign.Campaign` always produces.
+    strict
+        What to do when ``positive_label`` is absent from ``classes_``.
+
+        ``True`` (use for ensemble *members*)
+            Return 0.0. A member that never saw the positive class assigns it
+            probability zero, which is the mathematically correct answer.
+        ``False`` (use for a *top-level* model)
+            Fall back to the last column, so an externally fitted binary model
+            using labels other than {0, 1} still works.
     """
     proba = np.asarray(model.predict_proba(X), dtype=DEFAULT_DTYPE)
     if proba.ndim == 1:
         return proba
-    if proba.shape[1] == 1:
-        only = getattr(model, "classes_", np.array([0]))[0]
-        return np.full(X.shape[0], 1.0 if only == 1 else 0.0, dtype=DEFAULT_DTYPE)
+
     classes = list(getattr(model, "classes_", [0, 1]))
-    pos_index = classes.index(1) if 1 in classes else proba.shape[1] - 1
-    return proba[:, pos_index]
+    if proba.shape[1] == 1:
+        only = classes[0] if classes else 0
+        return np.full(
+            X.shape[0], 1.0 if only == positive_label else 0.0, dtype=DEFAULT_DTYPE
+        )
+    if positive_label in classes:
+        return proba[:, classes.index(positive_label)]
+    if strict:
+        return np.zeros(X.shape[0], dtype=DEFAULT_DTYPE)
+    return proba[:, -1]
 
 
 class SklearnAdapter(ModelAdapter):
@@ -346,17 +373,29 @@ class TreeEnsembleAdapter(ModelAdapter):
             task=f"{self.name} per-tree posterior samples",
             copies=2,
         ).raise_if_refused()
+
+        # The ensemble defines which label counts as a hit; members are read
+        # against that label using each member's own classes_.
+        ensemble_classes = list(getattr(self.estimator, "classes_", [0, 1]))
+        positive_label = 1 if 1 in ensemble_classes else ensemble_classes[-1]
+
         rows = []
         for tree in trees:
             if self.task == "classification" and hasattr(tree, "predict_proba"):
-                # Individual trees' classes_ can be a subset of the forest's.
-                proba = np.asarray(tree.predict_proba(X), dtype=DEFAULT_DTYPE)
-                if proba.ndim == 2 and proba.shape[1] >= 2:
-                    forest_classes = list(getattr(self.estimator, "classes_", [0, 1]))
-                    pos = forest_classes.index(1) if 1 in forest_classes else -1
-                    rows.append(proba[:, pos])
-                else:
-                    rows.append(np.ravel(proba).astype(DEFAULT_DTYPE))
+                # A member's classes_ can be a strict subset of the ensemble's,
+                # so the positive-class column must be located using the
+                # MEMBER's own classes_, never the ensemble's. Getting this
+                # wrong is silent and severe: a member that saw only inactives
+                # returns a single column of 1.0, which read as P(active)
+                # asserts that every compound is certainly active. In a
+                # low-hit-rate screen -- exactly this package's target case --
+                # bagging without sample_weight support produces such members
+                # routinely, and they corrupt the mean, the variance and the
+                # BALD score at once. strict=True because a member that never
+                # saw the positive class assigns it probability zero.
+                rows.append(
+                    _proba_positive(tree, X, positive_label=positive_label, strict=True)
+                )
             else:
                 rows.append(np.asarray(tree.predict(X), dtype=DEFAULT_DTYPE))
         return Posterior(np.vstack(rows), task=self.task)

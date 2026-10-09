@@ -104,6 +104,29 @@ gives BALD, one row gives Thompson. Adding a model family means writing one
 adapter in `contrib/` and touching no policy. Resist adding a policy that reaches
 past this abstraction for model internals.
 
+**A member's positive-class column comes from the MEMBER's `classes_`.**
+Bagging subsamples rows, so in a low-hit-rate screen many ensemble members see
+no actives and their `predict_proba` returns a single column. Indexing that
+with the *ensemble's* class order reads P(the one class it knows) as
+P(active) -- asserting every compound is certainly active, and corrupting the
+posterior mean, the variance and the BALD score at once. `_proba_positive`
+handles every case; use `strict=True` for members (absent positive class means
+probability zero) and `strict=False` for a top-level model. The tell is
+`posterior().mean` disagreeing with `predict_mean()` on the same fitted model,
+and `tests/test_contrib.py` asserts they agree.
+
+**Every hit count uses `hit_threshold`.** It is carried onto `RoundRecord`
+rather than defaulted to 0.5, because `_calibration_metrics` and the oracle
+comparison both use the configured threshold. Hard-coding 0.5 anywhere makes a
+potency campaign (pIC50, threshold 6.0) report a 100% hit rate, negative
+regret, and "fraction of achievable" above 1.0.
+
+**A flipped label crosses `hit_threshold`, it does not become 0.0/1.0.**
+Hit-ness is re-derived as `value > hit_threshold`, so writing a literal 1.0 is
+still an inactive whenever the threshold sits outside (0, 1). Noise would then
+only destroy actives and never create false ones, and `label_noise` would be
+measuring label deletion rather than label noise.
+
 **Degenerate posteriors raise, never degrade.** A single fitted classifier gives
 identical samples, so every information score is exactly zero and the "selected"
 batch is whatever the tie-break produced. `Posterior.require_informative()`

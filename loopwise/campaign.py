@@ -124,12 +124,19 @@ class RoundRecord:
     predicted_scores: np.ndarray
     observed_values: np.ndarray | None = None
     diagnostics: dict = field(default_factory=dict)
+    #: The campaign's hit threshold, carried here so that every hit count in
+    #: the report uses the same definition. Hard-coding 0.5 instead means a
+    #: campaign measuring potency in pIC50 units counts every positive reading
+    #: as a hit, reports a 100% hit rate, and -- because the oracle comparison
+    #: *does* use the configured threshold -- produces negative regret and
+    #: "fraction of achievable" above 1.0.
+    hit_threshold: float = 0.5
 
     @property
     def n_hits(self) -> int | None:
         if self.observed_values is None:
             return None
-        return int(np.nansum(self.observed_values > 0.5))
+        return int(np.nansum(self.observed_values > self.hit_threshold))
 
 
 class Campaign:
@@ -592,6 +599,7 @@ class Campaign:
                 predicted_scores=predicted,
                 observed_values=values,
                 diagnostics=pending.diagnostics,
+                hit_threshold=self.hit_threshold,
             )
         )
 

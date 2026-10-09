@@ -428,3 +428,54 @@ def test_384_plate_campaign(pool_and_truth):
     assert len(batch) == 280
     assert batch.plate_layout.n_plates == 1
     assert batch.plate_layout.control_wells_intact()
+
+
+# ------------------------------------- regressions: silent-corruption guards
+
+
+def test_hit_counts_use_the_configured_threshold(pool_and_truth):
+    """Regression: every hit count in the report must use ``hit_threshold``.
+
+    A campaign measuring potency in pIC50 units with ``hit_threshold=6.0``
+    once counted every reading above 0.5 as a hit, reporting a 100% hit rate.
+    Because the oracle comparison *did* use the configured threshold, the
+    report also produced negative regret and "fraction of achievable" above
+    1.0 -- internally inconsistent in the headline number.
+    """
+    pool, _, feature_cols = pool_and_truth
+    rng = np.random.default_rng(0)
+    labels = pd.Series(rng.uniform(3.0, 9.0, len(pool)).round(2), index=pool.index)
+    potency = dict(zip(pool["item_id"], labels, strict=True))
+    threshold = 6.0
+
+    campaign = Campaign(
+        pool=pool,
+        model=_model(),
+        feature_cols=feature_cols,
+        id_col="item_id",
+        label_col="potency",
+        budget=24,
+        policy="greedy",
+        hit_threshold=threshold,
+        seed=0,
+        initial_labels={i: potency[i] for i in list(pool["item_id"][:80])},
+    )
+    for _ in range(2):
+        batch = campaign.select()
+        campaign.observe(
+            {i: potency[i] for i in batch.frame["item_id"]}, label_col="potency"
+        )
+        measured = np.array([potency[i] for i in batch.frame["item_id"]])
+        assert campaign.history[-1].n_hits == int((measured > threshold).sum())
+
+    report = campaign.report(oracle_labels=potency)
+    frame = report.frame
+
+    # The report must agree with its own calibration block, which has always
+    # used the configured threshold.
+    # The calibration block stores its rates rounded to 4 decimals.
+    for row, calib in zip(frame.itertuples(), report.calibration, strict=True):
+        assert row.hit_rate == pytest.approx(calib["observed_hit_rate"], abs=1e-4)
+
+    assert (frame["cumulative_regret"] >= 0).all(), "negative regret"
+    assert (frame["fraction_of_achievable"] <= 1.0).all(), "found more than exists"

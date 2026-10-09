@@ -304,6 +304,16 @@ def replay_campaign(
     )
     ids = campaign.pool[campaign.id_col].to_numpy()
 
+    # A flipped classification label has to land on the *other side of
+    # hit_threshold*, not on a literal 0.0/1.0. Hit-ness is re-derived
+    # downstream as `value > hit_threshold`, so with a threshold outside
+    # (0, 1) -- a potency campaign at pIC50 6.0, say -- writing 1.0 is still
+    # an inactive. Noise would then only ever destroy actives and never create
+    # false ones, and the robustness experiment this parameter exists for
+    # would be measuring label *deletion* rather than label noise.
+    _inactive_value = float(min(hit_threshold - 1.0, 0.0))
+    _active_value = float(max(hit_threshold + 1.0, 1.0))
+
     def reveal(indices: np.ndarray) -> dict:
         """Hand back (possibly noisy) measurements for these pool rows."""
         values = truth[indices].copy()
@@ -312,7 +322,7 @@ def replay_campaign(
                 flip = rng.random(values.size) < label_noise
                 values = np.where(
                     flip,
-                    np.where(values > hit_threshold, 0.0, 1.0),
+                    np.where(values > hit_threshold, _inactive_value, _active_value),
                     values,
                 )
             else:

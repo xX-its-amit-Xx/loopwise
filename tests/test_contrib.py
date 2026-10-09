@@ -315,3 +315,75 @@ def test_glb1_pool_has_the_structure_the_docstring_claims(glb1_pool):
     affinity = pool["pharmacophore_0"]
     rescuer_mean = affinity[pool["rescues_folding"] == 1].mean()
     assert affinity.quantile(0.2) < rescuer_mean < affinity.quantile(0.95)
+
+
+# ------------------------------------- regressions: silent-corruption guards
+
+
+def test_ensemble_member_that_saw_one_class_is_not_read_as_certainly_active():
+    """Regression: a member's positive-class column must use the MEMBER's classes_.
+
+    Bagging subsamples rows, so in a low-hit-rate screen many members see no
+    actives at all. Such a member's ``predict_proba`` returns a single column --
+    the probability of the one class it knows. Read as P(active), that asserts
+    every compound is certainly active, which corrupts the posterior mean, the
+    variance and the BALD score simultaneously, and does it worst in exactly
+    the rare-hit regime this package targets.
+
+    The tell is that ``posterior().mean`` and ``predict_mean()`` disagree on
+    the same fitted model.
+    """
+    from sklearn.ensemble import BaggingClassifier
+    from sklearn.neighbors import KNeighborsClassifier
+
+    from loopwise.models import auto_adapter
+
+    rng = make_rng(0)
+    X = rng.normal(size=(30, 4)).astype(np.float32)
+    y = np.zeros(30, dtype=int)
+    y[[3, 17]] = 1  # a 6.7% hit rate
+
+    # KNeighbors does not support sample_weight, so sklearn subsamples rows and
+    # several members end up with classes_ == [0].
+    model = BaggingClassifier(
+        KNeighborsClassifier(1), n_estimators=20, max_samples=0.4, random_state=0
+    )
+    adapter = auto_adapter(model)
+    adapter.fit(X, y)
+    assert any(len(e.classes_) == 1 for e in model.estimators_), (
+        "test setup failed to produce a single-class member"
+    )
+
+    posterior = adapter.posterior(X, n_samples=20, rng=rng)
+    np.testing.assert_allclose(
+        posterior.mean,
+        adapter.predict_mean(X),
+        atol=0.02,
+        err_msg="posterior mean disagrees with predict_mean on the same model",
+    )
+    assert posterior.mean.mean() < 0.2, (
+        f"posterior claims a {posterior.mean.mean():.0%} mean activity on a "
+        "6.7%-hit-rate problem"
+    )
+
+
+def test_ensemble_member_missing_the_positive_class_contributes_zero():
+    """A member whose classes_ excludes the positive label has P(positive) = 0."""
+    from loopwise.models import _proba_positive
+
+    class Member:
+        classes_ = [0, 2]
+
+        def predict_proba(self, X):
+            return np.tile(np.array([0.3, 0.7]), (len(X), 1))
+
+    X = np.zeros((4, 2), dtype=np.float32)
+    # strict=True (ensemble member): the member never saw class 1.
+    np.testing.assert_allclose(
+        _proba_positive(Member(), X, positive_label=1, strict=True), np.zeros(4)
+    )
+    # strict=False (top-level model): fall back to the last column so an
+    # externally fitted binary model with labels {0, 2} still works.
+    np.testing.assert_allclose(
+        _proba_positive(Member(), X, positive_label=1, strict=False), np.full(4, 0.7)
+    )

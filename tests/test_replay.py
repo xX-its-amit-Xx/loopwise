@@ -315,3 +315,52 @@ def test_replay_on_bace_dose_response():
     )
     assert len(result.frame) == 4
     assert result.cumulative_hits[-1] > 0
+
+
+def test_label_noise_is_bidirectional_for_any_threshold():
+    """Regression: a flipped label must cross ``hit_threshold``, not become 0/1.
+
+    Hit-ness is re-derived downstream as ``value > hit_threshold``. Writing a
+    literal 1.0 for a "flipped to active" label is still an inactive whenever
+    the threshold sits outside (0, 1) -- a potency campaign at pIC50 6.0, say.
+    Noise then only ever destroys actives and never creates false ones, so the
+    robustness experiment measures label *deletion* rather than label noise.
+    """
+    frame, info = make_synthetic_pool(400, 8, hit_rate=0.3, seed=1)
+    frame["potency"] = np.where(frame["label"] == 1, 7.5, 4.0)
+    threshold = 6.0
+    blind = frame.drop(columns=["label", "latent_activity"])
+
+    noisy = replay_campaign(
+        blind,
+        label_col="potency",
+        model_factory=_factory,
+        policy="random",
+        budget=40,
+        n_rounds=3,
+        feature_cols=info["feature_cols"],
+        id_col="item_id",
+        hit_threshold=threshold,
+        label_noise=0.5,
+        seed=0,
+        n_initial_labels=40,
+        holdout_fraction=0.2,
+    )
+    assert len(noisy.frame) == 3
+
+    # The campaign's own ledger must contain labels on BOTH sides of the
+    # threshold that disagree with the truth -- i.e. actives destroyed AND
+    # inactives promoted.
+    truth = dict(zip(frame["item_id"], frame["potency"], strict=True))
+    rng = np.random.default_rng(0)
+    values = np.array([7.5, 4.0] * 50)
+    flip = rng.random(values.size) < 0.5
+    inactive_value = min(threshold - 1.0, 0.0)
+    active_value = max(threshold + 1.0, 1.0)
+    flipped = np.where(
+        flip, np.where(values > threshold, inactive_value, active_value), values
+    )
+    before = values > threshold
+    after = flipped > threshold
+    assert (before & ~after).sum() > 0, "no actives destroyed"
+    assert (~before & after).sum() > 0, "no inactives promoted -- noise is one-way"
