@@ -1,0 +1,127 @@
+cff-version: 1.2.0
+message: "If you use Loopwise in work you publish, please cite it."
+title: "Loopwise: active-learning experiment selection for small-n biological assays"
+abstract: >-
+  Loopwise implements and compares batch-selection policies for iterative
+  experimental campaigns in which a model proposes candidates, a small number
+  can be measured per round, and the measurements retrain the model. It spans
+  greedy exploitation through information-seeking selection (BALD, expected
+  model change, Thompson sampling) and batch-diversity constraints (facility
+  location, k-DPP), and adds the plate-level realism such campaigns require:
+  96- and 384-well layout with reserved controls, edge-effect-aware
+  randomization, per-compound and per-plate cost models, and replicate
+  policies. A retrospective replay harness evaluates every policy on fully
+  measured public datasets, reporting cumulative hits, held-out model quality
+  and rounds-to-target.
+type: software
+authors:
+  - family-names: Shenoy
+    given-names: Amit
+    email: shenoy.am@husky.neu.edu
+repository-code: "https://github.com/xX-its-amit-Xx/loopwise"
+license: GPL-3.0-or-later
+version: 0.1.0
+date-released: "2026-10-09"
+keywords:
+  - active learning
+  - experimental design
+  - high-throughput screening
+  - batch selection
+  - Bayesian optimization
+  - drug discovery
+references:
+  - type: article
+    title: "Bayesian Active Learning for Classification and Preference Learning"
+    authors:
+      - family-names: Houlsby
+        given-names: Neil
+      - family-names: Huszár
+        given-names: Ferenc
+      - family-names: Ghahramani
+        given-names: Zoubin
+      - family-names: Lengyel
+        given-names: Máté
+    year: 2011
+    notes: "BALD; the mutual-information acquisition function implemented as policy='bald'."
+  - type: article
+    title: "A Sequential Algorithm for Training Text Classifiers"
+    authors:
+      - family-names: Lewis
+        given-names: David D.
+      - family-names: Gale
+        given-names: William A.
+    year: 1994
+    notes: "Uncertainty sampling."
+  - type: article
+    title: "On the Likely Solution of a Problem in the Theory of Probability"
+    authors:
+      - family-names: Thompson
+        given-names: William R.
+    journal: Biometrika
+    volume: "25"
+    year: 1933
+    notes: "Thompson sampling."
+  - type: article
+    title: "An Analysis of Approximations for Maximizing Submodular Set Functions"
+    authors:
+      - family-names: Nemhauser
+        given-names: George L.
+      - family-names: Wolsey
+        given-names: Laurence A.
+      - family-names: Fisher
+        given-names: Marshall L.
+    year: 1978
+    notes: "The (1 - 1/e) guarantee that makes greedy facility location sound."
+  - type: conference-paper
+    title: "Fast Greedy MAP Inference for Determinantal Point Process to Improve Recommendation Diversity"
+    authors:
+      - family-names: Chen
+        given-names: Laming
+      - family-names: Zhang
+        given-names: Guoxin
+      - family-names: Zhou
+        given-names: Hanning
+    year: 2018
+    notes: "The k-DPP algorithm used here; needs one kernel column per step, never an n x n matrix."
+  - type: conference-paper
+    title: "Dropout as a Bayesian Approximation: Representing Model Uncertainty in Deep Learning"
+    authors:
+      - family-names: Gal
+        given-names: Yarin
+      - family-names: Ghahramani
+        given-names: Zoubin
+    year: 2016
+    notes: "MC dropout, used by contrib.TorchEnsembleAdapter."
+  - type: conference-paper
+    title: "Simple and Scalable Predictive Uncertainty Estimation using Deep Ensembles"
+    authors:
+      - family-names: Lakshminarayanan
+        given-names: Balaji
+      - family-names: Pritzel
+        given-names: Alexander
+      - family-names: Blundell
+        given-names: Charles
+    year: 2017
+    notes: "Deep ensembles."
+  - type: article
+    title: "MoleculeNet: a benchmark for molecular machine learning"
+    authors:
+      - family-names: Wu
+        given-names: Zhenqin
+      - family-names: Ramsundar
+        given-names: Bharath
+      - family-names: Feinberg
+        given-names: Evan N.
+      - family-names: Gomes
+        given-names: Joseph
+      - family-names: Geniesse
+        given-names: Caleb
+      - family-names: Pappu
+        given-names: Aneesh S.
+      - family-names: Leswing
+        given-names: Karl
+      - family-names: Pande
+        given-names: Vijay
+    journal: "Chemical Science"
+    year: 2018
+    notes: "Distribution source for the Tox21 and BACE datasets used in replay."
