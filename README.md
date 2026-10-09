@@ -37,6 +37,12 @@ Bands are the min-max envelope across seeds — a gap smaller than the bands is
 not a result. Model quality (middle panel) is PR-AUC on a fixed 20% holdout
 that no policy could select.*
 
+In that run, hybrid and greedy finish in a dead heat (134.8 ± 5.0 against
+134.2 ± 3.6 cumulative hits), the information-seeking policies trail slightly
+(bald 127.8, uncertainty 126.8), and every model-driven policy lands within
+noise of the others on model quality. Random finds 33.6. The right-hand panel
+is where the interesting thing happens, so we ran it for longer.
+
 ### What we found
 
 Over 30 rounds of 32 wells on Tox21 NR-AR (5 seeds, mean values):
@@ -86,20 +92,24 @@ Two further results that are easy to miss and matter more than the ranking:
 On the BACE-1 dose-response set (1,513 compounds, 24 wells x 10 rounds, 5
 seeds), the two objectives come apart cleanly:
 
-| Policy | Cumulative hits | Final PR-AUC |
+| Policy | Cumulative hits (± SD) | Final PR-AUC (± SD) |
 | --- | --- | --- |
-| greedy | **224.6** | **0.864** (worst) |
-| kdpp | 199.4 | 0.910 |
-| hybrid | 180.4 | 0.900 |
-| thompson | 153.6 | 0.941 |
-| bald | 123.0 | **0.946** (best) |
-| random | 105.0 | 0.932 |
+| greedy | **224.6 ± 7.4** | **0.864 ± 0.033** (worst) |
+| kdpp | 199.4 ± 2.5 | 0.910 ± 0.035 |
+| hybrid | 180.4 ± 9.5 | 0.900 ± 0.036 |
+| thompson | 153.6 ± 2.5 | 0.941 ± 0.028 |
+| bald | 123.0 ± 4.2 | **0.946 ± 0.013** (best) |
+| uncertainty | 122.4 ± 5.6 | 0.931 ± 0.019 |
+| random | 105.0 ± 3.7 | 0.932 ± 0.032 |
 
-Greedy finds 83% more hits than BALD **and ends with the worst model of any
-policy — worse than random selection.** If your campaign's deliverable is a
-shortlist of actives, that is a good trade. If the deliverable is a model you
-intend to use on the next target, greedy is destroying the thing you are paying
-for.
+![Hits now vs model quality later, BACE-1](results/figures/02_bace_hits_vs_model_quality.png)
+
+A clean Pareto front, and unlike the Tox21 numbers these gaps are several times
+the seed spread. Greedy finds 83% more hits than BALD **and ends with the worst
+model of any policy — worse than random selection.** If your campaign's
+deliverable is a shortlist of actives, that is a good trade. If the deliverable
+is a model you intend to use on the next target, greedy is destroying the thing
+you are paying for.
 
 That is the honest summary: *which* policy wins depends on the hit rate, the
 budget-to-pool ratio, the horizon, and which deliverable you are actually

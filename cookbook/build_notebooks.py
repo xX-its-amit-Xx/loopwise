@@ -37,7 +37,7 @@ NB01 = [
     md("""
 # 01 - Quickstart: three policies on a toy pool
 
-**The situation.** You have a model, a pool of 2,000 candidate compounds, and
+**The situation.** You have a model, a pool of 6,000 candidate compounds, and
 room for 96 wells per round. You can run six rounds. Which 96 do you pick?
 
 The default answer is *greedy*: take the 96 highest predictions. This notebook
@@ -80,7 +80,7 @@ make real screening hard:
 """),
     code("""
 pool, info = make_synthetic_pool(
-    n_items=2000, n_features=20, hit_rate=0.05, n_clusters=12, seed=0
+    n_items=6000, n_features=20, hit_rate=0.05, n_clusters=12, seed=0
 )
 feature_cols = info["feature_cols"]
 truth = dict(zip(pool["item_id"], pool["label"], strict=True))
@@ -230,7 +230,7 @@ n_actives = results["greedy"][0].n_actives
 fig = plot_comparison(
     long_frame,
     n_actives=n_actives,
-    title="Synthetic pool: 2,000 compounds, 5% hit rate, 96 wells x 6 rounds (3 seeds)",
+    title="Synthetic pool: 6,000 compounds, 5% hit rate, 96 wells x 6 rounds (3 seeds)",
 )
 fig.savefig(FIGDIR / "01_policy_comparison.png", dpi=150, bbox_inches="tight")
 """),
@@ -270,6 +270,31 @@ fig.tight_layout()
 fig.savefig(FIGDIR / "01_regret_curves.png", dpi=150, bbox_inches="tight")
 """),
     md("""
+## Saturation: why this toy problem flatters everything
+
+Look at the per-round hit rate. Every model-driven policy collapses to near
+zero by round 5 -- not because the policies failed, but because they *ran out
+of actives to find*. By round 5 they have each found roughly 230 of the 247
+actives in the pool.
+
+Two things cause that here, and it is worth separating them:
+
+1. **The problem is easy.** Activity depends on three features through a linear
+   rule plus noise, so a random forest reaches PR-AUC ~0.95 within two rounds.
+   Once the model is nearly perfect, *every* policy that uses it picks nearly
+   the same compounds, and the choice of policy stops mattering.
+2. **The budget is not small relative to what there is to find.** 576 wells is
+   under 10% of the pool, but the actives are concentrated in a few clusters,
+   so a tenth of the pool is more than enough to sweep them up.
+
+This is exactly the regime where active learning does **not** earn its
+complexity, and a toy pool is the easiest place in the world to accidentally
+demonstrate a policy "winning" under these conditions. Treat the ranking above
+as a check that the plumbing works, not as evidence.
+
+The next notebook runs the same comparison on real measured screening data,
+where the model tops out at PR-AUC ~0.53 and nothing saturates.
+
 ## What to take away
 
 1. **Greedy is strong early.** It is not a straw man, and on an inexhaustible
